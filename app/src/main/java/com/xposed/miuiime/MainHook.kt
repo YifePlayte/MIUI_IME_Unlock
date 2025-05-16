@@ -28,7 +28,7 @@ class MainHook : IXposedHookLoadPackage {
     private var navBarColor: Int? = null
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        //检查是否支持全面屏优化
+        // 检查是否支持全面屏优化
         if (PropertyUtils["ro.miui.support_miui_ime_bottom", "0"] != "1") return
         EzXHelperInit.initHandleLoadPackage(lpparam)
         EzXHelperInit.setLogTag(TAG)
@@ -37,7 +37,7 @@ class MainHook : IXposedHookLoadPackage {
     }
 
     private fun startHook(lpparam: XC_LoadPackage.LoadPackageParam) {
-        //检查是否为小米定制输入法
+        // 检查是否为小米定制输入法
         val isNonCustomize = !miuiImeList.contains(lpparam.packageName)
         if (isNonCustomize) {
             val sInputMethodServiceInjector =
@@ -56,7 +56,7 @@ class MainHook : IXposedHookLoadPackage {
             lpparam.classLoader
         )
 
-        //获取常用语的ClassLoader
+        // 获取常用语的ClassLoader
         findMethod("android.inputmethodservice.InputMethodModuleManager") {
             name == "loadDex" && parameterTypes.sameAs(ClassLoader::class.java, String::class.java)
         }.hookAfter { param ->
@@ -73,8 +73,8 @@ class MainHook : IXposedHookLoadPackage {
                     hookIsXiaoAiEnable(it)
                 }
 
-                //针对A11的修复切换输入法列表
-                it.getMethod("getSupportIme").hookReplace { _ ->
+                // 针对A11的修复切换输入法列表
+                it.getDeclaredMethod("getSupportIme").hookReplace { _ ->
                     it.getStaticObject("sBottomViewHelper")
                         .getObjectAs<InputMethodManager>("mImm").enabledInputMethodList
                 }
@@ -94,7 +94,7 @@ class MainHook : IXposedHookLoadPackage {
             clazz.putStaticObject("sIsImeSupport", 1)
             Log.i("Success:Hook field sIsImeSupport")
         }.onFailure {
-            Log.i("Failed:Hook field sIsImeSupport ")
+            Log.i("Failed:Hook field sIsImeSupport")
             Log.i(it)
         }
     }
