@@ -9,12 +9,15 @@ import com.github.kyuubiran.ezxhelper.utils.findMethod
 import com.github.kyuubiran.ezxhelper.utils.getObjectAs
 import com.github.kyuubiran.ezxhelper.utils.getStaticObject
 import com.github.kyuubiran.ezxhelper.utils.hookAfter
+import com.github.kyuubiran.ezxhelper.utils.hookBefore
 import com.github.kyuubiran.ezxhelper.utils.hookReplace
 import com.github.kyuubiran.ezxhelper.utils.hookReturnConstant
+import com.github.kyuubiran.ezxhelper.utils.invokeMethodAuto
 import com.github.kyuubiran.ezxhelper.utils.invokeStaticMethodAuto
 import com.github.kyuubiran.ezxhelper.utils.loadClassOrNull
 import com.github.kyuubiran.ezxhelper.utils.putStaticObject
 import com.github.kyuubiran.ezxhelper.utils.sameAs
+import dalvik.system.BaseDexClassLoader
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
@@ -66,14 +69,25 @@ class MainHook : IXposedHookLoadPackage {
         // 获取常用语的ClassLoader
         findMethod("android.inputmethodservice.InputMethodModuleManager") {
             name == "loadDex" && parameterTypes.sameAs(ClassLoader::class.java, String::class.java)
-        }.hookAfter { param ->
+        }.hookBefore { param ->
+            val loader = param.args[0] as ClassLoader
+            val dexPath = param.args[1] as String
+            // 系统原始逻辑，若已加载dex则直接返回，避免重复hook
+            if (loader !is BaseDexClassLoader) throw NoSuchMethodException("addDexPath method not found.")
+            runCatching {
+                Class.forName("com.miui.inputmethod.InputMethodBottomManager", true, loader)
+                param.result = null
+                return@hookBefore
+            }
+            loader.invokeMethodAuto("addDexPath", dexPath)
+
             hookDeleteNotSupportIme(
                 "com.miui.inputmethod.InputMethodBottomManager\$MiuiSwitchInputMethodListener",
-                param.args[0] as ClassLoader
+                loader
             )
             loadClassOrNull(
                 "com.miui.inputmethod.InputMethodBottomManager",
-                param.args[0] as ClassLoader
+                loader
             )?.also {
                 if (isNonCustomize) {
                     hookSIsImeSupport(it)
@@ -86,6 +100,7 @@ class MainHook : IXposedHookLoadPackage {
                         .getObjectAs<InputMethodManager>("mImm").enabledInputMethodList
                 }
             } ?: Log.e("Failed:Class not found: com.miui.inputmethod.InputMethodBottomManager")
+            param.result = null
         }
 
         Log.i("Hook MIUI IME Done!")
